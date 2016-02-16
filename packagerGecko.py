@@ -4,6 +4,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+from __future__ import division, absolute_import, print_function, unicode_literals
+
 import os
 import sys
 import re
@@ -12,13 +14,13 @@ import base64
 import urllib
 import json
 import io
-from ConfigParser import SafeConfigParser
-from StringIO import StringIO
+from .minisix import StringIO, SafeConfigParser, unicode, to_unicode, to_bytes
 import xml.dom.minidom as minidom
 import buildtools.localeTools as localeTools
 
-import packager
-from packager import readMetadata, getMetadataPath, getDefaultFileName, getBuildVersion, getTemplate, Files
+from . import packager
+from .packager import readMetadata, getMetadataPath, getDefaultFileName, getBuildVersion, getTemplate, Files
+
 
 KNOWN_APPS = {
   'conkeror':   '{a79fe89b-6662-4ff4-8e88-09950ad4dfde}',
@@ -82,14 +84,17 @@ def isValidLocale(localesDir, dir, includeIncomplete=False):
 def getLocales(baseDir, includeIncomplete=False):
   global defaultLocale
   localesDir = getLocalesDir(baseDir)
-  locales = filter(lambda dir:  isValidLocale(localesDir, dir, includeIncomplete), os.listdir(localesDir))
+  locales = [
+    dir for dir in os.listdir(localesDir)
+    if isValidLocale(localesDir, dir, includeIncomplete)]
   locales.sort(key=lambda x: '!' if x == defaultLocale else x)
   return locales
 
 def processFile(path, data, params):
-  if path.endswith('.manifest') and data.find('{{LOCALE}}') >= 0:
-    localesRegExp = re.compile(r'^(.*?){{LOCALE}}(.*?){{LOCALE}}(.*)$', re.M)
-    replacement = '\n'.join(map(lambda locale: r'\1%s\2%s\3' % (locale, locale), params['locales']))
+  if path.endswith('.manifest') and data.find(b'{{LOCALE}}') >= 0:
+    localesRegExp = re.compile(br'^(.*?){{LOCALE}}(.*?){{LOCALE}}(.*)$', re.M)
+    replacement = b'\n'.join(to_bytes(r'\1%s\2%s\3' % (locale, locale))
+                             for locale in params['locales'])
     data = re.sub(localesRegExp, replacement, data)
 
   return data
@@ -121,9 +126,9 @@ def getContributors(metadata):
     for option in options:
       value = metadata.get('contributors', option)
       if re.search(r'\D', option):
-        match = re.search(r'^\s*(\S+)\s+//([^/\s]+)/@(\S+)\s*$', value)
+        match = re.search(br'^\s*(\S+)\s+//([^/\s]+)/@(\S+)\s*$', value)
         if not match:
-          print >>sys.stderr, 'Warning: unrecognized contributor location "%s"\n' % value
+          sys.stderr.write('Warning: unrecognized contributor location "%s"\n\n' % value)
           continue
         baseDir = os.path.dirname(metadata.option_source('contributors', option))
         parts = match.group(1).split('/')
@@ -138,7 +143,7 @@ def getContributors(metadata):
   return main + sorted(additional, key=unicode.lower)
 
 def initTranslators(localeMetadata):
-  for locale in localeMetadata.itervalues():
+  for locale in localeMetadata.values():
     if 'translator' in locale:
       locale['translators'] = sorted(map(lambda t: t.strip(), locale['translator'].split(',')), key=unicode.lower)
     else:
@@ -192,18 +197,18 @@ def fixupLocales(params, files):
   importLocales(reference_params, reference_files)
 
   reference = {}
-  for path, data in reference_files.iteritems():
+  for path, data in reference_files.items():
     filename = path.split('/')[-1]
     data = localeTools.parseString(data.decode('utf-8'), filename)
     if data:
       reference[filename] = data
 
   for locale in params['locales']:
-    for file in reference.iterkeys():
+    for file in reference.keys():
       path = 'chrome/locale/%s/%s' % (locale, file)
       if path in files:
         data = localeTools.parseString(files[path].decode('utf-8'), path)
-        for key, value in reference[file].iteritems():
+        for key, value in reference[file].items():
           if not key in data:
             files[path] += localeTools.generateStringEntry(key, value, path).encode('utf-8')
       else:
@@ -220,22 +225,22 @@ def addMissingFiles(params, files):
     'requires': {},
     'metadata': params['metadata'],
     'multicompartment': params['multicompartment'],
-    'applications': dict((v, k) for k, v in KNOWN_APPS.iteritems()),
+    'applications': dict((v, k) for k, v in KNOWN_APPS.items()),
   }
 
   def checkScript(name):
-    content = files[name]
-    for match in re.finditer(r'(?:^|\s)require\(\s*"([\w\-]+)"\s*\)', content):
-      templateData['requires'][match.group(1)] = True
+    content = files[name]  # is bytes()
+    for match in re.finditer(br'(?:^|\s)require\(\s*"([\w\-]+)"\s*\)', content):
+      templateData['requires'][to_unicode(match.group(1))] = True
       if name.startswith('chrome/content/'):
         templateData['hasChromeRequires'] = True
-    if name.startswith('lib/') and re.search(r'\bXMLHttpRequest\b', content):
+    if name.startswith('lib/') and re.search(br'\bXMLHttpRequest\b', content):
       templateData['hasXMLHttpRequest'] = True
     if not '/' in name or name.startswith('lib/'):
-      if re.search(r'(?:^|\s)onShutdown\.', content):
+      if re.search(br'(?:^|\s)onShutdown\.', content):
         templateData['hasShutdownHandlers'] = True
 
-  for name, content in files.iteritems():
+  for name, content in files.items():
     if name == 'chrome.manifest':
       templateData['hasChrome'] = True
     elif name == 'defaults/prefs.json':
@@ -243,7 +248,7 @@ def addMissingFiles(params, files):
     elif name.endswith('.js'):
       checkScript(name)
     elif name.endswith('.xul'):
-      match = re.search(r'<(?:window|dialog)\s[^>]*\bwindowtype="([^">]+)"', content)
+      match = re.search(br'<(?:window|dialog)\s[^>]*\bwindowtype="([^">]+)"', content)
       if match:
         templateData['chromeWindows'].append(match.group(1))
 
@@ -345,7 +350,7 @@ def createBuild(baseDir, type="gecko", outFile=None, locales=None, buildNum=None
   files['install.rdf'] = createManifest(params)
   files.readMappedFiles(mapped)
   files.read(baseDir, skip=skip)
-  for name, path in getChromeSubdirs(baseDir, params['locales']).iteritems():
+  for name, path in getChromeSubdirs(baseDir, params['locales']).items():
     if os.path.isdir(path):
       files.read(path, 'chrome/%s' % name, skip=skip)
   importLocales(params, files)

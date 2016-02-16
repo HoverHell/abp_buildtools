@@ -7,11 +7,14 @@
 # Note: These are the base functions common to all packagers, the actual
 # packagers are implemented in packagerGecko and packagerChrome.
 
+from __future__ import division, absolute_import, print_function, unicode_literals
+
 import sys, os, re, codecs, subprocess, json, zipfile
-from StringIO import StringIO
-from chainedconfigparser import ChainedConfigParser
+from .minisix import StringIO
+from .chainedconfigparser import ChainedConfigParser
 
 import buildtools
+
 
 def getDefaultFileName(metadata, version, ext):
   return '%s-%s.%s' % (metadata.get('general', 'basename'), version, ext)
@@ -33,7 +36,7 @@ def getBuildNum(baseDir):
     from buildtools.ensure_dependencies import Mercurial, Git
     if Mercurial().istype(baseDir):
       result = subprocess.check_output(['hg', 'id', '-R', baseDir, '-n'])
-      return re.sub(r'\D', '', result)
+      return re.sub(br'\D', b'', result)
     elif Git().istype(baseDir):
       result = subprocess.check_output(['git', 'rev-list', 'HEAD'], cwd=baseDir)
       return len(result.splitlines())
@@ -97,7 +100,7 @@ class Files(dict):
     else:
       with open(path, 'rb') as file:
         if relpath in self:
-          print >>sys.stderr, 'Warning: File %s defined multiple times' % relpath
+          sys.stderr.write('Warning: File %s defined multiple times' % relpath)
         self[relpath] = file.read()
 
   def readMappedFiles(self, mappings):
@@ -112,7 +115,7 @@ class Files(dict):
       if os.path.exists(path):
         self.read(path, target)
       else:
-        print >>sys.stderr, 'Warning: Mapped file %s doesn\'t exist' % source
+        sys.stderr.write("Warning: Mapped file %s doesn't exist\n" % source)
 
   def preprocess(self, filenames, params={}):
     import jinja2
@@ -125,7 +128,7 @@ class Files(dict):
 
   def zip(self, outFile, sortKey=None):
     zip = zipfile.ZipFile(outFile, 'w', zipfile.ZIP_DEFLATED)
-    names = self.keys()
+    names = list(self.keys())
     names.sort(key=sortKey)
     for name in names:
       zip.writestr(name, self[name])

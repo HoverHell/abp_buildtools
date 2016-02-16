@@ -12,10 +12,12 @@ import struct
 import io
 from StringIO import StringIO
 
-import packager
-from packager import readMetadata, getMetadataPath, getDefaultFileName, getBuildVersion, getTemplate, Files
+from . import packager
+from .packager import readMetadata, getMetadataPath, getDefaultFileName, getBuildVersion, getTemplate, Files
+
 
 defaultLocale = 'en_US'
+
 
 def getIgnoredFiles(params):
   return {'store.description'}

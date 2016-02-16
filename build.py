@@ -4,12 +4,18 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+
+from __future__ import division, absolute_import, print_function  # , unicode_literals
+
 import os, sys, re, subprocess, shutil, buildtools
 from getopt import getopt, GetoptError
-from StringIO import StringIO
+from .minisix import string_types, StringIO
+
 from zipfile import ZipFile
 
+
 knownTypes = ('gecko', 'chrome', 'opera', 'safari', 'generic')
+
 
 class Command(object):
   name = property(lambda self: self._name)
@@ -69,7 +75,7 @@ class Command(object):
 commandsList = []
 commands = {}
 def addCommand(handler, name):
-  if isinstance(name, basestring):
+  if isinstance(name, string_types):
     aliases = ()
   else:
     name, aliases = (name[0], name[1:])
@@ -107,7 +113,7 @@ def usage(scriptName, type, commandName=None):
       descriptions.append('  %s [-t %s] %s %s' % (scriptName, type, commandText, descriptionParts[0]))
       for part in descriptionParts[1:]:
         descriptions.append('  %s     %s  %s %s' % (' ' * len(scriptName), ' ' * len(type), ' ' * len(commandText), part))
-    print '''Usage:
+    print('''Usage:
 
 %(descriptions)s
 
@@ -118,7 +124,7 @@ For details on a command run:
     'scriptName': scriptName,
     'type': type,
     'descriptions': '\n'.join(descriptions)
-  }
+  })
   else:
     global commands
     command = commands[commandName]
@@ -143,7 +149,7 @@ For details on a command run:
       options.append('  %s %s %s' % (shortText.ljust(11), longText.ljust(19), descrParts[0]))
       for part in descrParts[1:]:
         options.append('  %s %s %s' % (' ' * 11, ' ' * 19, part))
-    print '''%(scriptName)s [-t %(type)s] %(name)s %(params)s
+    print('''%(scriptName)s [-t %(type)s] %(name)s %(params)s
 
 %(description)s
 
@@ -156,7 +162,7 @@ Options:
       'params': command.params,
       'description': description,
       'options': '\n'.join(options)
-    }
+    })
 
 
 def runBuild(baseDir, scriptName, opts, args, type):
@@ -199,7 +205,7 @@ def runBuild(baseDir, scriptName, opts, args, type):
 
 def runAutoInstall(baseDir, scriptName, opts, args, type):
   if len(args) == 0:
-    print 'Port of the Extension Auto-Installer needs to be specified'
+    print('Port of the Extension Auto-Installer needs to be specified')
     usage(scriptName, type, 'autoinstall')
     return
 
@@ -279,7 +285,7 @@ def readLocaleConfig(baseDir, type, metadata):
 
 def setupTranslations(baseDir, scriptName, opts, args, type):
   if len(args) < 1:
-    print 'Project key is required to update translation master files.'
+    print('Project key is required to update translation master files.')
     usage(scriptName, type, 'setuptrans')
     return
 
@@ -297,7 +303,7 @@ def setupTranslations(baseDir, scriptName, opts, args, type):
 
 def updateTranslationMaster(baseDir, scriptName, opts, args, type):
   if len(args) < 1:
-    print 'Project key is required to update translation master files.'
+    print('Project key is required to update translation master files.')
     usage(scriptName, type, 'translate')
     return
 
@@ -319,7 +325,7 @@ def updateTranslationMaster(baseDir, scriptName, opts, args, type):
 
 def uploadTranslations(baseDir, scriptName, opts, args, type):
   if len(args) < 1:
-    print 'Project key is required to upload existing translations.'
+    print('Project key is required to upload existing translations.')
     usage(scriptName, type, 'uploadtrans')
     return
 
@@ -340,7 +346,7 @@ def uploadTranslations(baseDir, scriptName, opts, args, type):
 
 def getTranslations(baseDir, scriptName, opts, args, type):
   if len(args) < 1:
-    print 'Project key is required to update translation master files.'
+    print('Project key is required to update translation master files.')
     usage(scriptName, type, 'translate')
     return
 
@@ -373,7 +379,7 @@ def showDescriptions(baseDir, scriptName, opts, args, type):
   localeCodes.sort()
   for localeCode in localeCodes:
     locale = data[localeCode]
-    print ('''%s
+    print(('''%s
 %s
 %s
 %s
@@ -383,12 +389,12 @@ def showDescriptions(baseDir, scriptName, opts, args, type):
        locale['description'] if 'description' in locale else 'None',
        locale['description.short'] if 'description.short' in locale else 'None',
        locale['description.long'] if 'description.long' in locale else 'None',
-      )).encode('utf-8')
+      )).encode('utf-8'))
 
 
 def generateDocs(baseDir, scriptName, opts, args, type):
   if len(args) == 0:
-    print 'No target directory specified for the documentation'
+    print('No target directory specified for the documentation')
     usage(scriptName, type, 'docs')
     return
   targetDir = args[0]
@@ -423,23 +429,24 @@ def runReleaseAutomation(baseDir, scriptName, opts, args, type):
       downloadsRepo = value
 
   if len(args) == 0:
-    print 'No version number specified for the release'
+    print('No version number specified for the release')
     usage(scriptName, type, 'release')
     return
   version = args[0]
   if re.search(r'[^\d\.]', version):
-    print 'Wrong version number format'
+    print('Wrong version number format')
     usage(scriptName, type, 'release')
     return
 
+
   if type == "gecko" and len(keyFiles) == 0:
-    print >>sys.stderr, "Warning: no key file specified, creating an unsigned release build\n"
+    sys.stderr.write("Warning: no key file specified, creating an unsigned release build\n\n")
   elif type == "gecko" and len(keyFiles) > 1:
-    print >>sys.stderr, "Error: too many key files, only one required"
+    sys.stderr.write("Error: too many key files, only one required")
     usage(scriptName, type, 'release')
     return
   elif type == "chrome" and len(keyFiles) != 2:
-    print >>sys.stderr, "Error: wrong number of key files specified, two keys (Chrome and Safari) required for the release"
+    sys.stderr.write("Error: wrong number of key files specified, two keys (Chrome and Safari) required for the release")
     usage(scriptName, type, 'release')
     return
 
@@ -538,9 +545,9 @@ def getType(baseDir, scriptName, args):
     del args[1]
     del args[0]
     if type not in knownTypes:
-      print '''
+      print('''
 Unknown type %s specified, supported types are: %s
-''' % (type, ', '.join(knownTypes))
+''' % (type, ', '.join(knownTypes)))
       return None
     return type
 
@@ -553,16 +560,16 @@ Unknown type %s specified, supported types are: %s
   if len(types) == 1:
     return types[0]
   elif len(types) > 1:
-    print '''
+    print('''
 Ambiguous repository type, please specify -t parameter explicitly, e.g.
 %s -t %s build
-''' % (scriptName, types[0])
+''' % (scriptName, types[0]))
     return None
   else:
-    print '''
+    print('''
 No metadata file found in this repository, a metadata file like
 metadata.%s is required.
-''' % knownTypes[0]
+''' % knownTypes[0])
     return None
 
 def processArgs(baseDir, args):
@@ -576,19 +583,19 @@ def processArgs(baseDir, args):
 
   if len(args) == 0:
     args = ['build']
-    print '''
+    print('''
 No command given, assuming "build". For a list of commands run:
 
   %s help
-''' % scriptName
+''' % scriptName)
 
   command = args[0]
   if command in commands:
     if commands[command].isSupported(type):
       try:
         opts, args = commands[command].parseArgs(type, args[1:])
-      except GetoptError, e:
-        print str(e)
+      except GetoptError as exc:
+        print(str(exc))
         usage(scriptName, type, command)
         sys.exit(2)
       for option, value in opts:
@@ -597,8 +604,8 @@ No command given, assuming "build". For a list of commands run:
           sys.exit()
       commands[command](baseDir, scriptName, opts, args, type)
     else:
-      print 'Command %s is not supported for this application type' % command
+      print('Command %s is not supported for this application type' % command)
       usage(scriptName, type)
   else:
-    print 'Command %s is unrecognized' % command
+    print('Command %s is unrecognized' % command)
     usage(scriptName, type)

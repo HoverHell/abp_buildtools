@@ -13,11 +13,11 @@ import io
 import errno
 import logging
 import subprocess
-import urlparse
 import argparse
 
 from collections import OrderedDict
-from ConfigParser import RawConfigParser
+from .minisix import RawConfigParser, urlsplit, urljoin
+
 
 USAGE = """
 A dependencies file should look like this:
@@ -132,7 +132,7 @@ class Git():
 
   def postprocess_url(self, url):
     # Handle alternative syntax of SSH URLS
-    if "@" in url and ":" in url and not urlparse.urlsplit(url).scheme:
+    if "@" in url and ":" in url and not urlsplit(url).scheme:
       return "ssh://" + url.replace(":", "/", 1)
     return url
 
@@ -216,8 +216,8 @@ def read_deps(repodir):
         if spec:
           result[key] = spec
     return result
-  except IOError, e:
-    if e.errno != errno.ENOENT:
+  except IOError as exc:
+    if exc.errno != errno.ENOENT:
       raise
     return None
 
@@ -256,7 +256,7 @@ def ensure_repo(parentrepo, parenttype, target, type, root, sourcename):
   if os.path.exists(root):
     url = os.path.join(root, sourcename)
   else:
-    url = urlparse.urljoin(root, sourcename)
+    url = urljoin(root, sourcename)
 
   logging.info("Cloning repository %s into %s" % (url, target))
   repo_types[type].clone(url, target)
@@ -323,8 +323,8 @@ def resolve_deps(repodir, level=0, self_update=True, overrideroots=None, skipdep
     try:
       with io.open(source, "rb") as handle:
         sourcedata = handle.read()
-    except IOError, e:
-      if e.errno != errno.ENOENT:
+    except IOError as exc:
+      if exc.errno != errno.ENOENT:
         raise
       logging.warning("File %s doesn't exist, skipping self-update" % source)
       return

@@ -4,9 +4,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import re, os, sys, codecs, json, urllib, urllib2
-from StringIO import StringIO
-from ConfigParser import SafeConfigParser
+from __future__ import division, absolute_import, print_function  # , unicode_literals
+
+import re, os, sys, codecs, json, urllib
+from .minisix import StringIO, urlopen, Request, SafeConfigParser
 from zipfile import ZipFile
 from xml.parsers.expat import ParserCreate, XML_PARAM_ENTITY_PARSING_ALWAYS
 
@@ -156,7 +157,8 @@ def parsePropertiesString(data, path):
       yield (unescapeProperty(key), currentComment, unescapeProperty(value))
       currentComment = None
     elif re.search(r'\S', line):
-      print >>sys.stderr, 'Unrecognized data in file %s: %s' % (path, line)
+      sys.stderr.write(
+        'Unrecognized data in file %s: %s\n' % (path, line))
 
 def parseString(data, path):
   result = {'_origData': data}
@@ -283,10 +285,10 @@ def setupTranslations(localeConfig, projectName, key):
       locales.add(mapLocale('ISO-15897', locale))
 
   if 'gecko' in localeConfig['target_platforms']:
-    firefoxLocales = urllib2.urlopen('http://www.mozilla.org/en-US/firefox/all.html').read()
+    firefoxLocales = urlopen('http://www.mozilla.org/en-US/firefox/all.html').read()
     for match in re.finditer(r'&amp;lang=([\w\-]+)"', firefoxLocales):
       locales.add(mapLocale('BCP-47', match.group(1)))
-    langPacks = urllib2.urlopen('https://addons.mozilla.org/en-US/firefox/language-tools/').read()
+    langPacks = urlopen('https://addons.mozilla.org/en-US/firefox/language-tools/').read()
     for match in re.finditer(r'<tr>.*?</tr>', langPacks, re.S):
       if match.group(0).find('Install Language Pack') >= 0:
         match2 = re.search(r'lang="([\w\-]+)"', match.group(0))
@@ -294,16 +296,17 @@ def setupTranslations(localeConfig, projectName, key):
           locales.add(mapLocale('BCP-47', match2.group(1)))
 
   allowed = set()
-  allowedLocales = urllib2.urlopen('http://crowdin.net/page/language-codes').read()
+  allowedLocales = urlopen('http://crowdin.net/page/language-codes').read()
   for match in re.finditer(r'<tr>\s*<td\b[^<>]*>([\w\-]+)</td>', allowedLocales, re.S):
     allowed.add(match.group(1))
   if not allowed.issuperset(locales):
-    print 'Warning, following locales aren\'t allowed by server: ' + ', '.join(locales - allowed)
+    print('Warning, following locales aren\'t allowed by server: ' +
+          ', '.join(locales - allowed))
 
   locales = list(locales & allowed)
   locales.sort()
   params = urllib.urlencode([('languages[]', locale) for locale in locales])
-  result = urllib2.urlopen('http://api.crowdin.net/api/project/%s/edit-project?key=%s' % (projectName, key), params).read()
+  result = urlopen('http://api.crowdin.net/api/project/%s/edit-project?key=%s' % (projectName, key), params).read()
   if result.find('<success') < 0:
     raise Exception('Server indicated that the operation was not successful\n' + result)
 
@@ -319,15 +322,15 @@ def postFiles(files, url):
   body += '--%s--\r\n' % boundary
 
   body = body.encode('utf-8')
-  request = urllib2.Request(url, StringIO(body))
+  request = Request(url, StringIO(body))
   request.add_header('Content-Type', 'multipart/form-data; boundary=%s' % boundary)
   request.add_header('Content-Length', len(body))
-  result = urllib2.urlopen(request).read()
+  result = urlopen(request).read()
   if result.find('<success') < 0:
     raise Exception('Server indicated that the operation was not successful\n' + result)
 
 def updateTranslationMaster(localeConfig, metadata, dir, projectName, key):
-  result = json.load(urllib2.urlopen('http://api.crowdin.net/api/project/%s/info?key=%s&json=1' % (projectName, key)))
+  result = json.load(urlopen('http://api.crowdin.net/api/project/%s/info?key=%s&json=1' % (projectName, key)))
 
   existing = set(map(lambda f: f['name'], result['files']))
   add = []
@@ -360,7 +363,7 @@ def updateTranslationMaster(localeConfig, metadata, dir, projectName, key):
   if len(update):
     postFiles(update, 'http://api.crowdin.net/api/project/%s/update-file?key=%s' % (projectName, key))
   for file in existing:
-    result = urllib2.urlopen('http://api.crowdin.net/api/project/%s/delete-file?key=%s&file=%s' % (projectName, key, file)).read()
+    result = urlopen('http://api.crowdin.net/api/project/%s/delete-file?key=%s&file=%s' % (projectName, key, file)).read()
     if result.find('<success') < 0:
       raise Exception('Server indicated that the operation was not successful\n' + result)
 
@@ -389,11 +392,11 @@ def uploadTranslations(localeConfig, metadata, dir, locale, projectName, key):
     )
 
 def getTranslations(localeConfig, projectName, key):
-  result = urllib2.urlopen('http://api.crowdin.net/api/project/%s/export?key=%s' % (projectName, key)).read()
+  result = urlopen('http://api.crowdin.net/api/project/%s/export?key=%s' % (projectName, key)).read()
   if result.find('<success') < 0:
     raise Exception('Server indicated that the operation was not successful\n' + result)
 
-  result = urllib2.urlopen('http://api.crowdin.net/api/project/%s/download/all.zip?key=%s' % (projectName, key)).read()
+  result = urlopen('http://api.crowdin.net/api/project/%s/download/all.zip?key=%s' % (projectName, key)).read()
   zip = ZipFile(StringIO(result))
   dirs = {}
 

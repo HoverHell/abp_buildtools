@@ -6,8 +6,8 @@
 
 import os
 import io
-import ConfigParser
-from StringIO import StringIO
+from .minisix import ConfigParser, StringIO, string_types
+
 
 class Item(tuple):
   def __new__(cls, name, value, source):
@@ -124,7 +124,7 @@ class ChainedConfigParser(ConfigParser.SafeConfigParser):
             self._origin[(section, self.optionxform(option))] = filename
 
   def read(self, filenames):
-    if isinstance(filenames, basestring):
+    if isinstance(filenames, string_types):
       filenames = [filenames]
 
     read_ok = []
