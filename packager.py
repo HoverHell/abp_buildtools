@@ -10,7 +10,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 
 import sys, os, re, codecs, subprocess, json, zipfile
-from .minisix import StringIO
+from .minisix import StringIO, to_unicode
 from .chainedconfigparser import ChainedConfigParser
 
 import buildtools
@@ -36,9 +36,11 @@ def getBuildNum(baseDir):
     from buildtools.ensure_dependencies import Mercurial, Git
     if Mercurial().istype(baseDir):
       result = subprocess.check_output(['hg', 'id', '-R', baseDir, '-n'])
-      return re.sub(br'\D', b'', result)
+      result = to_unicode(result)
+      return re.sub(r'\D', '', result)
     elif Git().istype(baseDir):
       result = subprocess.check_output(['git', 'rev-list', 'HEAD'], cwd=baseDir)
+      result = to_unicode(result)
       return len(result.splitlines())
   except subprocess.CalledProcessError:
     pass
